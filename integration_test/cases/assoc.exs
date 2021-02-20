@@ -114,6 +114,54 @@ defmodule Ecto.Integration.AssocTest do
     assert [^u1] = TestRepo.all(query)
   end
 
+  test "has_many through many_to_many and has_many" do
+    %User{id: uid1} = TestRepo.insert!(%User{name: "Gabriel"})
+    %User{id: uid2} = TestRepo.insert!(%User{name: "Isadora"})
+
+    p1 = TestRepo.insert!(%Post{title: "p1", author_id: uid1})
+    p2 = TestRepo.insert!(%Post{title: "p2", author_id: uid2})
+    p3 = TestRepo.insert!(%Post{title: "p3", author_id: uid2})
+
+    TestRepo.insert_all "posts_users", [[post_id: p1.id, user_id: uid1],
+                                        [post_id: p1.id, user_id: uid2]]
+
+    [pid1, pid2, pid3] =
+      Ecto.assoc(p1, [:posts_through_users])
+      |> TestRepo.all()
+      |> Enum.map(fn %Post{id: id} -> id end)
+      |> Enum.sort()
+
+    assert p1.id == pid1
+    assert p2.id == pid2
+    assert p3.id == pid3
+  end
+
+  test "has_many through two many_to_many associations" do
+    %User{id: uid1} = TestRepo.insert!(%User{name: "Gabriel"})
+    %User{id: uid2} = TestRepo.insert!(%User{name: "Isadora"})
+
+    p1 = TestRepo.insert!(%Post{title: "p1", author_id: uid1})
+    p2 = TestRepo.insert!(%Post{title: "p2", author_id: uid2})
+    p3 = TestRepo.insert!(%Post{title: "p3", author_id: uid2})
+
+    TestRepo.insert_all "posts_users", [[post_id: p1.id, user_id: uid1],
+                                        [post_id: p1.id, user_id: uid2]]
+
+    TestRepo.insert!(%PostUser{post_id: p1.id, user_id: uid2})
+    TestRepo.insert!(%PostUser{post_id: p3.id, user_id: uid1})
+    TestRepo.insert!(%PostUser{post_id: p2.id, user_id: uid2})
+
+    [pid1, pid2, pid3] =
+      Ecto.assoc(p1, [:posts_through_posts])
+      |> TestRepo.all()
+      |> Enum.map(fn %Post{id: id} -> id end)
+      |> Enum.sort()
+
+    assert p1.id == pid1
+    assert p2.id == pid2
+    assert p3.id == pid3
+  end
+
   test "many_to_many assoc" do
     p1 = TestRepo.insert!(%Post{title: "1"})
     p2 = TestRepo.insert!(%Post{title: "2"})

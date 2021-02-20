@@ -56,6 +56,13 @@ defmodule Ecto.Integration.Post do
     belongs_to :author, Ecto.Integration.User
     many_to_many :users, Ecto.Integration.User,
       join_through: "posts_users", on_delete: :delete_all, on_replace: :delete
+
+    # Tests a has through with a many to many and a has many
+    has_many :posts_through_users, through: [:users, :posts]
+
+    # Tests a has through with two many to many associations
+    has_many :posts_through_posts, through: [:users, :schema_posts]
+
     many_to_many :ordered_users, Ecto.Integration.User, join_through: "posts_users", preload_order: [desc: :name]
     many_to_many :unique_users, Ecto.Integration.User,
       join_through: "posts_users", unique: true
