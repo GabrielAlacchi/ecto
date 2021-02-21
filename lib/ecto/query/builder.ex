@@ -1075,6 +1075,19 @@ defmodule Ecto.Query.Builder do
   end
 
   @doc """
+  Returns the largest binding used in the AST a query epxression
+  """
+  @spec largest_bind_in_expr(Macro.t()) :: non_neg_integer()
+  def largest_bind_in_expr(expr) do
+    {_, max_value} = Macro.prewalk(expr, -1, fn
+      {:&, _, [bind]} = node, acc when is_integer(bind) -> {node, max(acc, bind)}
+      node, acc -> {node, acc}
+    end)
+
+    max_value
+  end
+
+  @doc """
   Bump interpolations by the length of parameters.
   """
   def bump_interpolations(expr, []), do: expr

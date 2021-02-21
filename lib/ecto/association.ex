@@ -184,6 +184,7 @@ defmodule Ecto.Association do
   def assoc_query(%{owner: owner, through: [h|t], field: field}, extra, query, values) do
     refl = owner.__schema__(:association, h) ||
             raise "unknown association `#{h}` for `#{inspect owner}` (used by through association `#{field}`)"
+
     assoc_query refl, t ++ extra, query, values
   end
 

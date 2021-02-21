@@ -17,14 +17,15 @@ defmodule Ecto.Query.Planner do
   in order to keep proper binding order.
   """
   def query_to_joins(qual, source, %{wheres: wheres, joins: joins}, position) do
-    on = %QueryExpr{file: __ENV__.file, line: __ENV__.line, expr: true, params: []}
+    true_expr = %QueryExpr{file: __ENV__.file, line: __ENV__.line, expr: true, params: []}
 
     on =
-      Enum.reduce(wheres, on, fn %BooleanExpr{op: op, expr: expr, params: params}, acc ->
+      Enum.reduce(wheres, true_expr, fn %BooleanExpr{op: op, expr: expr, params: params}, acc ->
         merge_expr_and_params(op, acc, expr, params)
       end)
 
     join = %JoinExpr{qual: qual, source: source, file: __ENV__.file, line: __ENV__.line, on: on}
+
     last = length(joins) + position
 
     mapping = fn
@@ -32,9 +33,24 @@ defmodule Ecto.Query.Planner do
       ix -> ix + position - 1
     end
 
-    for {%{on: on} = join, ix} <- Enum.with_index(joins ++ [join]) do
+    joins = for {%{on: on} = join, ix} <- Enum.with_index(joins ++ [join]) do
       %{join | on: rewrite_sources(on, mapping), ix: ix + position}
     end
+
+    # Rearrange on expressions to their minimum possible index
+    {raw_joins, on_exprs} = Enum.reduce(joins, {[], []}, fn %JoinExpr{on: on} = join, {raw_joins, on_exprs} ->
+      {raw_joins ++ [%JoinExpr{join | on: true_expr}], on_exprs ++ [on]}
+    end)
+
+    Enum.reduce(on_exprs, raw_joins, fn on, joins ->
+      # Decide what join expression to put the expression on
+      largest_bind = Ecto.Query.Builder.largest_bind_in_expr(on.expr)
+      join_index = max(largest_bind - 1, 0)
+
+      List.update_at(joins, join_index, fn %JoinExpr{on: prev_on} = join ->
+        %JoinExpr{join | on: merge_expr_and_params(:and, prev_on, on.expr, on.params)}
+      end)
+    end)
   end
 
   defp merge_expr_and_params(op, %QueryExpr{expr: left_expr, params: left_params} = struct,
